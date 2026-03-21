@@ -7,7 +7,11 @@
 
 A powerful local tool for testing and benchmarking LLM APIs. Test connectivity, measure performance, and chat with multiple providers through a beautiful Web UI or CLI.
 
-![LLM Tester Screenshot](docs/screenshot.png)
+## 📸 Screenshots
+
+| Dashboard | Chat Interface |
+|:---------:|:--------------:|
+| ![Dashboard](docs/llm-tester_01.png) | ![Chat](docs/llm-tester_02.png) |
 
 ## ✨ Features
 
