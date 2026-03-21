@@ -1,77 +1,73 @@
 # 🧪 LLM Tester
 
-A comprehensive local tool for testing Large Language Model APIs. Test connectivity, measure performance, and validate context handling across multiple LLM providers.
+[![Version](https://img.shields.io/badge/version-0.1.0-blue.svg)](https://github.com/zhaijianxiao-hue/llm-tester)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![Python](https://img.shields.io/badge/python-3.10%2B-brightgreen.svg)](https://www.python.org/)
+[![React](https://img.shields.io/badge/react-18-blue.svg)](https://react.dev/)
 
-## Features
+A powerful local tool for testing and benchmarking LLM APIs. Test connectivity, measure performance, and chat with multiple providers through a beautiful Web UI or CLI.
 
-- **🔌 Connectivity Testing** - Verify API keys, check model availability, measure latency
-- **⚡ Performance Benchmarking** - Measure response time, TTFT (Time to First Token), tokens per second
-- **🧠 Context Testing** - Test context window size and memory capabilities
-- **🔄 Multi-Provider Support** - OpenAI, Claude, Gemini, DeepSeek, Ollama, and more
-- **📊 Rich Reports** - JSON and Markdown report generation
-- **🖥️ CLI Interface** - Beautiful command-line interface with progress indicators
-- **🌐 Web UI** - Modern web-based interface with real-time progress and visualization
+![LLM Tester Screenshot](docs/screenshot.png)
 
-## Installation
+## ✨ Features
+
+- 🖥️ **Modern Web UI** - Sci-fi themed interface with real-time streaming chat
+- 💬 **Multi-turn Chat** - Session management with SQLite persistence
+- 🔌 **Multi-Provider** - OpenAI, Claude, Gemini, DeepSeek, Ollama, and custom endpoints
+- ⚡ **Performance Metrics** - Latency, TTFT, TPOT, tokens/second
+- 📊 **Rich Reports** - JSON and Markdown exports
+- 🔒 **Local First** - All data stays on your machine
+
+## 🚀 Quick Start
+
+### Prerequisites
+
+- Python 3.10+
+- Node.js 18+ (for Web UI)
+
+### Installation
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-org/llm-tester.git
+git clone https://github.com/zhaijianxiao-hue/llm-tester.git
 cd llm-tester
 
-# Install with pip
+# Create virtual environment (recommended)
+python -m venv .venv
+.venv\Scripts\activate  # Windows
+# source .venv/bin/activate  # Linux/macOS
+
+# Install dependencies
 pip install -e .
 
-# Or install with development dependencies
-pip install -e ".[dev]"
+# Install frontend dependencies
+cd frontend && npm install && cd ..
 ```
 
-## Quick Start
-
-### Option 1: Web UI (Recommended)
+### Run Web UI
 
 ```bash
-# Start the web interface
-llm-tester-web
+# Windows
+start-web.bat
 
-# Or use the startup script
-./start-web.sh  # Linux/macOS
-start-web.bat   # Windows
+# Linux/macOS
+./start-web.sh
 ```
 
-Then open http://localhost:5173 in your browser.
+Open http://localhost:5173 in your browser.
 
-### Option 2: CLI
+## ⚙️ Configuration
 
-```bash
-# Test connectivity
-llm-tester test connectivity --all
+Create a `.env` file in the project root:
 
-# Test specific provider
-llm-tester test connectivity --provider openai --model gpt-4
-
-# Performance benchmark
-llm-tester test performance --provider claude --iterations 5
-
-# Context testing
-llm-tester test context --provider openai --size 4096
-
-# Run all tests
-llm-tester test all
+```env
+OPENAI_API_KEY=sk-xxx
+ANTHROPIC_API_KEY=sk-ant-xxx
+DEEPSEEK_API_KEY=sk-xxx
+GOOGLE_API_KEY=xxx
 ```
 
-## Configuration
-
-### Environment Variables
-
-```bash
-export OPENAI_API_KEY="sk-..."
-export ANTHROPIC_API_KEY="sk-ant-..."
-```
-
-### Configuration File
-
-Create `config/config.yaml`:
+Or configure providers in `config/config.yaml`:
 
 ```yaml
 providers:
@@ -79,122 +75,118 @@ providers:
     api_key: "${OPENAI_API_KEY}"
     models:
       - gpt-4
+      - gpt-4o
       - gpt-3.5-turbo
-  
-  claude:
-    api_key: "${ANTHROPIC_API_KEY}"
+
+  ollama:
+    base_url: http://localhost:11434
     models:
-      - claude-3-opus-20240229
-      - claude-3-sonnet-20240229
+      - llama2
+      - mistral
+
+  custom-openai:
+    api_key: "${CUSTOM_API_KEY}"
+    base_url: https://your-api.com/v1
+    models:
+      - your-model
 ```
 
-## CLI Commands
+## 📖 Usage
 
-### Test Commands
+### Web UI
+
+| Page | Description |
+|------|-------------|
+| Dashboard | Overview of all providers and test status |
+| Chat | Multi-turn conversation with streaming |
+| Connectivity | Test API keys and model availability |
+| Performance | Benchmark response times and throughput |
+| Context | Test context window handling |
+| Config | Manage provider settings |
+| Reports | View and export test reports |
+
+### CLI
 
 ```bash
-# Connectivity tests
-llm-tester test connectivity --provider openai
+# Test connectivity
 llm-tester test connectivity --all
 
-# Performance tests
-llm-tester test performance --provider claude --iterations 3
-llm-tester test performance --model gpt-4 --max-tokens 200
+# Performance benchmark
+llm-tester test performance --provider openai --iterations 5
 
-# Context tests
-llm-tester test context --provider openai --size 8192
-
-# Run all tests
-llm-tester test all
+# Context testing
+llm-tester test context --provider claude --size 4096
 ```
 
-### Configuration Commands
+## 📊 Metrics Explained
+
+| Metric | Description |
+|--------|-------------|
+| Latency | Total request time (ms) |
+| TTFT | Time to First Token (ms) |
+| TPOT | Time per Output Token (ms) |
+| Tokens/s | Generation speed |
+
+## 🏗️ Tech Stack
+
+| Layer | Technology |
+|-------|------------|
+| Frontend | React 18, TypeScript, Tailwind CSS, Vite |
+| Backend | Python, FastAPI, Uvicorn |
+| Database | SQLite |
+| LLM SDK | OpenAI SDK (compatible with multiple providers) |
+
+## 📁 Project Structure
+
+```
+llm-tester/
+├── src/llm_tester/        # Python backend
+│   ├── core/              # Config, engine, models
+│   ├── providers/         # LLM provider implementations
+│   └── web/               # FastAPI web app
+├── frontend/              # React frontend
+│   └── src/
+│       ├── pages/         # Page components
+│       ├── components/    # UI components
+│       └── lib/           # API client, utilities
+├── config/                # Configuration files
+└── tests/                 # Test suite
+```
+
+## 🤝 Supported Providers
+
+| Provider | Status | Notes |
+|----------|--------|-------|
+| OpenAI | ✅ | GPT-4, GPT-4o, GPT-3.5 |
+| Claude | ✅ | Claude 3 Opus/Sonnet/Haiku |
+| Gemini | ✅ | Gemini Pro, Gemini 1.5 |
+| DeepSeek | ✅ | DeepSeek Chat, Coder |
+| Ollama | ✅ | Local models |
+| Custom | ✅ | Any OpenAI-compatible API |
+
+## 🔧 Development
 
 ```bash
-# List current configuration
-llm-tester config list
-
-# Initialize config file
-llm-tester config init
-
-# Set provider API key
-llm-tester config set openai --api-key sk-xxx
-```
-
-## Output Example
-
-```
-╭─────────────────────────────────────────────────────────────╮
-│               Connectivity Test Results                      │
-├────────────┬─────────────────┬──────────┬─────────┬─────────┤
-│ Provider   │ Model           │ Status   │ Latency │ Details │
-├────────────┼─────────────────┼──────────┼─────────┼─────────┤
-│ openai     │ gpt-4           │ ✓ PASSED │ 523ms   │         │
-│ openai     │ gpt-3.5-turbo   │ ✓ PASSED │ 312ms   │         │
-│ claude     │ claude-3-opus   │ ✓ PASSED │ 891ms   │         │
-│ claude     │ claude-3-sonnet │ ✓ PASSED │ 445ms   │         │
-╰────────────┴─────────────────┴──────────┴─────────┴─────────╯
-
-Summary: Total: 4 | Passed: 4 | Failed: 0 | Errors: 0
-```
-
-## Supported Providers
-
-| Provider | Models | Authentication |
-|----------|--------|----------------|
-| OpenAI | GPT-4, GPT-4-turbo, GPT-3.5-turbo, GPT-4o | API Key |
-| Claude | Claude 3 Opus, Sonnet, Haiku | API Key |
-| Gemini | Gemini Pro, Gemini 1.5 | API Key |
-| DeepSeek | DeepSeek Chat, DeepSeek Coder | API Key |
-| Ollama | llama2, mistral, codellama (local) | None required |
-
-## Development
-
-```bash
-# Install development dependencies
+# Install dev dependencies
 pip install -e ".[dev]"
 
 # Run tests
 pytest
-
-# Run with coverage
-pytest --cov=llm_tester
 
 # Type checking
 mypy src/llm_tester
 
 # Linting
 ruff check src/llm_tester
+
+# Frontend dev
+cd frontend && npm run dev
 ```
 
-## Project Structure
+## 📝 License
 
-```
-llm-tester/
-├── src/llm_tester/
-│   ├── cli.py              # CLI commands
-│   ├── core/
-│   │   ├── config.py       # Configuration management
-│   │   ├── engine.py       # Test execution engine
-│   │   └── models.py       # Data models
-│   ├── providers/
-│   │   ├── base.py         # Provider interface
-│   │   ├── openai.py       # OpenAI provider
-│   │   ├── claude.py       # Claude provider
-│   │   └── ...
-│   └── reports/
-│       └── generator.py    # Report generation
-├── config/
-│   └── config.yaml         # Configuration template
-├── tests/
-│   └── ...
-└── pyproject.toml
-```
+[MIT](LICENSE)
 
-## License
+## 🙏 Acknowledgments
 
-MIT License - see [LICENSE](LICENSE) for details.
-
-## Contributing
-
-Contributions are welcome! Please read our [Contributing Guide](CONTRIBUTING.md) for details.
+Built with [FastAPI](https://fastapi.tiangolo.com/), [React](https://react.dev/), and [Tailwind CSS](https://tailwindcss.com/).
