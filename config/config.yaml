@@ -1,0 +1,60 @@
+providers:
+  changyou-openai:
+    api_key: ${CHANGYOU_OPENAI_API_KEY}
+    base_url: https://ai.changyou.club/v1
+    display_name: changyou-openai
+    enabled: true
+    extra_headers: {}
+    max_retries: 3
+    models:
+    - gpt-5.3-codex
+    - gpt-5.4
+    timeout: 60
+  claude:
+    api_key: ${ANTHROPIC_API_KEY}
+    models:
+    - claude-3-opus-20240229
+    - claude-3-sonnet-20240229
+    - claude-3-haiku-20240307
+    - claude-3-5-sonnet-20241022
+  deepseek:
+    api_key: ${DEEPSEEK_API_KEY}
+    base_url: https://api.deepseek.com
+    models:
+    - deepseek-chat
+    - deepseek-coder
+  gemini:
+    api_key: ${GOOGLE_API_KEY}
+    models:
+    - gemini-pro
+    - gemini-1.5-pro
+  ollama:
+    api_key: ollama
+    base_url: http://localhost:11434
+    display_name: Ollama (Local)
+    enabled: true
+    extra_headers: {}
+    max_retries: 3
+    models:
+    - llama2
+    - mistral
+    timeout: 60
+  openai:
+    api_key: ${OPENAI_API_KEY}
+    models:
+    - gpt-4
+    - gpt-4-turbo
+    - gpt-4o
+    - gpt-4o-mini
+    - gpt-3.5-turbo
+reporting:
+  formats:
+  - json
+  - markdown
+  include_timestamp: true
+  output_dir: ./reports
+test_settings:
+  max_retries: 3
+  test_iterations: 3
+  timeout: 60
+  warmup_iterations: 1
