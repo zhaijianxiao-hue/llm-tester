@@ -1,16 +1,59 @@
+/**
+ * ChatPage - Preserved Behavior Verification Matrix
+ * ================================================
+ * 
+ * This matrix documents expected behaviors that must remain functional
+ * after any refactoring. Run manual verification for these flows:
+ * 
+ * | Feature | Expected Behavior | Verification Notes |
+ * |---------|-------------------|-------------------|
+ * | Session load | Sessions loaded on mount, select first if none selected | ✓ loadSessions() in useEffect |
+ * | Session create | New session button creates empty session, switches to it | ✓ handleNewSession() |
+ * | Session switch | Clicking session in sidebar switches currentSession, loads messages | ✓ handleSelectSession() |
+ * | Session rename | Edit button → inline edit → Enter/Save updates title | ✓ handleEditTitle/handleSaveTitle |
+ * | Session delete | Delete button → confirm → remove from list, switch to next or create new | ✓ handleDeleteSession() |
+ * | Provider selection | Dropdown shows configured providers, selection persists to session | ✓ setSelectedProvider, updateSession |
+ * | Model selection | Models fetched per provider, selection persists to session | ✓ fetchModels, setSelectedModel |
+ * | Temperature panel | Settings toggle shows/hides slider, value updates session | ✓ showSettings, setTemperature |
+ * | Clear chat | Trash button → confirm → clears messages locally and via API | ✓ clearChat() |
+ * | Assistant success | Streaming response renders, metrics display, SUCCESS badge shown | ✓ sendMessage success path |
+ * | Assistant error | Network/API failures show ERROR badge with message | ✓ catch block in sendMessage |
+ * | Metrics visibility | Latency, TTFT, TPOT, tokens displayed per assistant message | ✓ MetricCard components |
+ * | Streaming continuity | Loading → first token → streaming → completed, smooth UX | ✓ streamingContent state |
+ * | Empty state | No messages → shows "Start a conversation" placeholder | ✓ hasEmptyState in DialogueTimeline |
+ * 
+ * Accessibility notes:
+ * - CharacterStage: aria-label="Character stage", actors aria-hidden
+ * - DialogueTimeline: role="log", aria-live="polite" for streaming updates
+ * - InputConsole: aria-label, sr-only label for textarea
+ * 
+ * Responsive behavior:
+ * - Mobile (<640px): Stage collapses to stacked portrait panels
+ * - Sidebar: Collapsible, auto-hides at narrow viewports
+ * - Touch targets: Minimum 44px height for interactive elements
+ */
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { 
-  Send, Trash2, Loader2, Clock, Zap, MessageSquare, Hash, Timer, 
-  AlertCircle, CheckCircle, Plus, Edit2, X, Copy, Check, 
-  Settings, Sparkles, Cpu, PanelLeftClose, PanelLeft, Zap as LogoIcon, ArrowLeft
+import {
+  Trash2, CheckCircle, Plus, Edit2, X,
+  Settings, Sparkles, Cpu, PanelLeftClose, PanelLeft, Zap as LogoIcon, ArrowLeft,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { Button } from '../components/ui/Button'
 import { listSessions, createSession, getSession, updateSession, deleteSession, addMessage, generateTitle, Session, Message } from '../lib/api'
-import ReactMarkdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
-import rehypeHighlight from 'rehype-highlight'
 import 'highlight.js/styles/github-dark.css'
+import { CharacterStage } from '../features/chat/components/CharacterStage'
+import { DialogueTimeline } from '../features/chat/components/DialogueTimeline'
+import { InputConsole } from '../features/chat/components/InputConsole'
+import {
+  buildThinkingCaption,
+  deriveConversationTone,
+  deriveNpcMood,
+  derivePlayerMood,
+  deriveStableRandomValue,
+  maybeInjectSideLine,
+} from '../features/chat-performance/performanceEngine'
+import type { CharacterMood, ToneTag } from '../features/chat-performance/types'
+import type { StageActorState } from '../features/chat/components/chatStage.types'
 
 interface Provider {
   name: string
@@ -24,92 +67,6 @@ function ParticleBackground() {
     <div className="particles-bg">
       <div className="absolute inset-0 cyber-grid-bg opacity-50" />
       <div className="absolute inset-0 bg-gradient-to-b from-transparent via-cyber-dark/50 to-cyber-dark" />
-    </div>
-  )
-}
-
-// Typing Indicator Component
-function TypingIndicator() {
-  return (
-    <div className="typing-indicator">
-      <span />
-      <span />
-      <span />
-    </div>
-  )
-}
-
-// Metric Card Component
-function MetricCard({ icon: Icon, label, value, color = 'cyan' }: { 
-  icon: React.ElementType
-  label: string
-  value: string | number
-  color?: 'cyan' | 'purple' | 'pink' | 'green'
-}) {
-  const colorClasses = {
-    cyan: 'text-neon-cyan border-neon-cyan/30 bg-neon-cyan/5',
-    purple: 'text-neon-purple border-neon-purple/30 bg-neon-purple/5',
-    pink: 'text-neon-pink border-neon-pink/30 bg-neon-pink/5',
-    green: 'text-neon-green border-neon-green/30 bg-neon-green/5',
-  }
-
-  return (
-    <div className={`metric-card ${colorClasses[color]}`}>
-      <Icon className="w-3.5 h-3.5 opacity-80" />
-      <span className="text-xs text-gray-500">{label}</span>
-      <span className={`text-xs font-mono font-medium ${colorClasses[color].split(' ')[0]}`}>{value}</span>
-    </div>
-  )
-}
-
-function MessageContent({ content, isStreaming }: { content: string; isStreaming?: boolean }) {
-  const [copied, setCopied] = useState(false)
-  
-  const handleCopy = useCallback((text: string) => {
-    navigator.clipboard.writeText(text)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
-  }, [])
-
-  return (
-    <div className="prose prose-sm prose-cyber max-w-none prose-pre:bg-black/60 prose-pre:border prose-pre:border-neon-cyan/15 prose-pre:rounded-lg prose-code:text-neon-pink prose-code:bg-neon-cyan/10 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:border prose-code:border-neon-cyan/20 prose-headings:text-white prose-p:text-gray-200 prose-a:text-neon-cyan prose-strong:text-white prose-ul:text-gray-200 prose-ol:text-gray-200 prose-li:text-gray-200 prose-blockquote:text-gray-400 prose-blockquote:border-neon-purple prose-blockquote:bg-neon-purple/5 prose-blockquote:rounded-r-lg prose-blockquote:py-2 prose-blockquote:px-4">
-      <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
-        rehypePlugins={[rehypeHighlight]}
-        components={{
-          pre: ({ children, ...props }) => (
-            <div className="relative group cyber-code">
-              <pre {...props} className="!bg-black/60 !p-4 rounded-lg overflow-x-auto text-sm">
-                {children}
-              </pre>
-              <button
-                type="button"
-                onClick={() => handleCopy(String(children).replace(/<[^>]*>/g, ''))}
-                className="absolute top-2 right-2 p-1.5 bg-cyber-card/80 hover:bg-neon-cyan/20 border border-neon-cyan/20 rounded transition-all opacity-0 group-hover:opacity-100"
-                title="Copy code"
-              >
-                {copied ? <Check className="w-4 h-4 text-neon-green" /> : <Copy className="w-4 h-4 text-neon-cyan/70" />}
-              </button>
-            </div>
-          ),
-          code: ({ className, children, ...props }) => {
-            const isInline = !className
-            if (isInline) {
-              return (
-                <code className="bg-neon-cyan/10 text-neon-cyan px-1.5 py-0.5 rounded text-sm border border-neon-cyan/20 font-mono" {...props}>
-                  {children}
-                </code>
-              )
-            }
-            return <code className={`${className} font-mono`} {...props}>{children}</code>
-          },
-        }}
-      >
-        {content}
-      </ReactMarkdown>
-      {isStreaming && (
-        <span className="inline-block w-2 h-4 bg-neon-cyan animate-pulse ml-1 shadow-neon-cyan" />
-      )}
     </div>
   )
 }
@@ -135,6 +92,7 @@ export default function ChatPage() {
   const [editingTitle, setEditingTitle] = useState<string | null>(null)
   const [editTitleValue, setEditTitleValue] = useState('')
   const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [playerMood, setPlayerMood] = useState<CharacterMood>('neutral')
   
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
@@ -303,6 +261,7 @@ export default function ChatPage() {
     }
 
     const userContent = input.trim()
+    setPlayerMood(derivePlayerMood(userContent))
     setInput('')
     setIsLoading(true)
     setStreamingContent('')
@@ -486,13 +445,6 @@ export default function ChatPage() {
     }
   }, [input, isLoading, selectedProvider, selectedModel, currentSession, messages, temperature, loadSessions])
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
-      sendMessage()
-    }
-  }
-
   const clearChat = () => {
     if (currentSession && confirm('Clear all messages in this session?')) {
       setMessages([])
@@ -503,6 +455,42 @@ export default function ChatPage() {
   const formatNumber = (n: number | undefined, decimals: number = 0): string => {
     if (n === undefined || n === null) return '-'
     return n.toFixed(decimals)
+  }
+
+  const latestAssistantMessage = [...messages].reverse().find((message) => message.role === 'assistant') ?? null
+  const latestUserMessage = [...messages].reverse().find((message) => message.role === 'user') ?? null
+  const currentTone: ToneTag = deriveConversationTone({
+    latestAssistantContent: latestAssistantMessage?.content,
+    streamingContent,
+  })
+  const thinkingCaption = buildThinkingCaption({
+    includeNonsense: false,
+    isLoading,
+    streamingContent,
+    tone: currentTone,
+  })
+  const npcMood = deriveNpcMood({
+    isLoading,
+    streamingContent,
+    currentTone,
+  })
+  const sideLineResult = isLoading
+    ? maybeInjectSideLine({
+        randomValue: deriveStableRandomValue(`${currentSession?.id ?? 'session'}:${latestUserMessage?.content ?? input}:${currentTone}:${streamingContent || 'waiting'}`),
+        tone: currentTone,
+      })
+    : { kind: 'none' as const, sideLine: null, replaceAnswerBody: false }
+  const npcState: StageActorState = {
+    label: '如来',
+    mood: npcMood,
+    aura: 'radiant',
+    intensity: streamingContent ? 'streaming' : isLoading ? 'focused' : 'idle',
+  }
+  const playerState: StageActorState = {
+    label: '主角',
+    mood: playerMood || 'neutral',
+    aura: 'mortal',
+    intensity: input.trim() || isLoading ? 'focused' : 'idle',
   }
 
   return (
@@ -594,10 +582,17 @@ export default function ChatPage() {
             {/* Sessions List - Independent Scroll */}
             <div className="flex-1 overflow-y-auto p-3 space-y-2 scrollbar-thin">
               {sessions.map(session => (
-                <button
-                  type="button"
+                <div
                   key={session.id}
                   onClick={() => handleSelectSession(session)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      handleSelectSession(session)
+                    }
+                  }}
                   className={`
                     session-item w-full text-left p-3 rounded-xl cursor-pointer group
                     border border-transparent
@@ -658,7 +653,7 @@ export default function ChatPage() {
                       </div>
                     </div>
                   )}
-                </button>
+                </div>
               ))}
             </div>
           </>
@@ -760,164 +755,35 @@ export default function ChatPage() {
         </div>
 
         {/* Messages Area */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6 relative">
-          {/* Empty State */}
-          {messages.length === 0 && !streamingContent && (
-            <div className="h-full flex items-center justify-center">
-              <div className="text-center">
-                <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-neon-cyan/10 to-neon-purple/10 
-                  border border-neon-cyan/20 flex items-center justify-center animate-float">
-                  <MessageSquare className="w-10 h-10 text-neon-cyan/50" />
-                </div>
-                <h3 className="text-xl font-display text-gray-300 mb-2">Start a conversation</h3>
-                <p className="text-sm text-gray-500 max-w-md mx-auto">
-                  Select a provider and model, then type your message below to begin testing
-                </p>
-              </div>
-            </div>
-          )}
-          
-          {/* Messages */}
-          {messages.map((msg, index) => (
-            <div
-              key={msg.id}
-              className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-slide-up`}
-              style={{ animationDelay: `${index * 50}ms` }}
-            >
-              <div
-                className={`
-                  max-w-[85%] rounded-2xl px-5 py-4 
-                  ${msg.role === 'user'
-                    ? 'message-user text-gray-100'
-                    : 'message-ai'
-                  }
-                `}
-              >
-                {/* User Message */}
-                {msg.role === 'user' ? (
-                  <div className="whitespace-pre-wrap text-gray-100">{msg.content}</div>
-                ) : (
-                  <>
-                    {/* AI Message Content */}
-                    <MessageContent content={msg.content} />
-                    
-                    {/* Metrics Section */}
-                    <div className="mt-4 pt-4 border-t border-neon-purple/20">
-                      {/* Status Badge */}
-                      <div className="flex items-center gap-2 mb-3">
-                        {msg.status === 'success' ? (
-                          <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-neon-green/10 border border-neon-green/30">
-                            <CheckCircle className="w-3.5 h-3.5 text-neon-green" />
-                            <span className="text-xs font-medium text-neon-green font-mono">SUCCESS</span>
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-500/10 border border-red-500/30">
-                            <AlertCircle className="w-3.5 h-3.5 text-red-400" />
-                            <span className="text-xs font-medium text-red-400 font-mono">ERROR</span>
-                          </div>
-                        )}
-                        {msg.metrics && (
-                          <span className="text-xs text-gray-500 font-mono">
-                            {msg.metrics.modelName}
-                          </span>
-                        )}
-                      </div>
-                      
-                      {/* Metrics Grid */}
-                      {msg.metrics && (
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                          <MetricCard icon={Clock} label="Latency" value={`${formatNumber(msg.metrics.latencyMs)}ms`} color="cyan" />
-                          <MetricCard icon={Zap} label="TTFT" value={`${formatNumber(msg.metrics.ttftMs)}ms`} color="purple" />
-                          <MetricCard icon={Timer} label="TPOT" value={`${formatNumber(msg.metrics.tpotMs, 1)}ms`} color="pink" />
-                          <MetricCard icon={Hash} label="Total" value={`${msg.metrics.totalTokens} tok`} color="green" />
-                          <MetricCard icon={Sparkles} label="Prompt" value={`${msg.metrics.promptTokens} tok`} color="cyan" />
-                          <MetricCard icon={Cpu} label="Completion" value={`${msg.metrics.completionTokens} tok`} color="purple" />
-                          <MetricCard icon={Zap} label="Speed" value={`${formatNumber(msg.metrics.tokensPerSecond, 1)} t/s`} color="pink" />
-                          <MetricCard icon={Settings} label="Temp" value={`${msg.metrics.temperature}`} color="green" />
-                        </div>
-                      )}
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
-          ))}
-          
-          {/* Streaming Content */}
-          {streamingContent && (
-            <div className="flex justify-start animate-slide-up">
-              <div className="max-w-[85%] rounded-2xl px-5 py-4 message-ai">
-                <MessageContent content={streamingContent} isStreaming />
-              </div>
-            </div>
-          )}
-          
-          {/* Loading Indicator */}
-          {isLoading && !streamingContent && (
-            <div className="flex justify-start animate-slide-up">
-              <div className="message-ai rounded-2xl px-5 py-4">
-                <TypingIndicator />
-              </div>
-            </div>
-          )}
-          
-          <div ref={messagesEndRef} />
-        </div>
+        <CharacterStage npc={npcState} player={playerState}>
+          <>
+            <DialogueTimeline
+              messages={messages}
+              streamingContent={streamingContent}
+              isLoading={isLoading}
+              thinkingCaption={thinkingCaption}
+              sideLine={sideLineResult.sideLine}
+              currentTone={currentTone}
+              formatNumber={formatNumber}
+              endMarkerRef={messagesEndRef}
+            />
+          </>
+        </CharacterStage>
 
         {/* Input Area */}
         <div className="flex-shrink-0 p-4 relative z-20">
-          <div className="glass-card rounded-2xl p-4 border border-neon-cyan/20">
-            <div className="flex gap-3">
-              <div className="flex-1 relative">
-                <textarea
-                  ref={inputRef}
-                  className="w-full bg-cyber-dark/50 border border-neon-cyan/20 rounded-xl px-4 py-3 
-                    resize-none focus:outline-none focus:border-neon-cyan focus:shadow-neon-cyan/20 focus:shadow-lg
-                    text-gray-200 placeholder-gray-500 font-body transition-all duration-300"
-                  placeholder="Type your message... (Enter to send, Shift+Enter for new line)"
-                  rows={4}
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  disabled={isLoading}
-                />
-              </div>
-              <Button
-                onClick={sendMessage}
-                disabled={!input.trim() || isLoading || !selectedProvider || !selectedModel}
-                className="self-end h-12 px-6"
-                glow
-              >
-                {isLoading ? (
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                ) : (
-                  <Send className="w-5 h-5" />
-                )}
-              </Button>
-            </div>
-            
-            {/* Status Bar */}
-            <div className="mt-3 flex items-center gap-4 text-xs text-gray-500 font-mono">
-              <div className="flex items-center gap-1.5">
-                <span className="text-gray-600">Provider:</span>
-                <span className={selectedProvider ? 'text-neon-cyan' : 'text-gray-600'}>
-                  {selectedProvider || 'None'}
-                </span>
-              </div>
-              <span className="text-neon-cyan/30">|</span>
-              <div className="flex items-center gap-1.5">
-                <span className="text-gray-600">Model:</span>
-                <span className={selectedModel ? 'text-neon-purple' : 'text-gray-600'}>
-                  {selectedModel || 'None'}
-                </span>
-              </div>
-              <span className="text-neon-cyan/30">|</span>
-              <div className="flex items-center gap-1.5">
-                <span className="text-gray-600">Temp:</span>
-                <span className="text-neon-pink">{temperature}</span>
-              </div>
-            </div>
-          </div>
+          <InputConsole
+            ref={inputRef}
+            value={input}
+            onChange={setInput}
+            onSend={sendMessage}
+            canSend={Boolean(input.trim()) && !isLoading && Boolean(selectedProvider) && Boolean(selectedModel)}
+            disabled={isLoading}
+            isLoading={isLoading}
+            providerLabel={selectedProvider || 'None'}
+            modelLabel={selectedModel || 'None'}
+            temperatureLabel={String(temperature)}
+          />
         </div>
       </div>
     </div>
