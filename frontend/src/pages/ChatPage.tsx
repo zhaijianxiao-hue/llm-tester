@@ -582,10 +582,17 @@ export default function ChatPage() {
             {/* Sessions List - Independent Scroll */}
             <div className="flex-1 overflow-y-auto p-3 space-y-2 scrollbar-thin">
               {sessions.map(session => (
-                <button
-                  type="button"
+                <div
                   key={session.id}
                   onClick={() => handleSelectSession(session)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      handleSelectSession(session)
+                    }
+                  }}
                   className={`
                     session-item w-full text-left p-3 rounded-xl cursor-pointer group
                     border border-transparent
@@ -646,7 +653,7 @@ export default function ChatPage() {
                       </div>
                     </div>
                   )}
-                </button>
+                </div>
               ))}
             </div>
           </>
